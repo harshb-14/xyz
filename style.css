@@ -1,0 +1,1959 @@
+/*
+  FILE OVERVIEW
+  This stylesheet is the presentation layer. It builds the landscape from
+  positioned HTML elements, gradients, borders, shadows, pseudo-elements,
+  and CSS animations; no image files or CSS framework are required.
+
+  JAVASCRIPT CONNECTION
+  script.js changes selected custom properties on :root (the document element).
+  Rules below read those variables for sky colors, celestial positions, opacity,
+  water reflections, and cabin lighting. CSS transitions interpolate many
+  changed properties so each one-second JavaScript update looks continuous.
+
+  LAYERING
+  The scene is a full-viewport positioning context. Its sky, mountain layers,
+  lake, golden-hour tint, and foreground are stacked with z-index; time text
+  and the timeline sit above the artwork. Elements with pointer-events:none
+  are decorative and do not intercept interaction.
+
+  RESPONSIVENESS AND MOTION
+  clamp(), viewport units, and media queries resize/reposition the composition.
+  The final media query reduces animation and transition duration when the
+  visitor has enabled prefers-reduced-motion.
+*/
+
+/* RUNTIME-ADJUSTABLE CUSTOM PROPERTIES
+   These defaults prevent an unstyled flash before JavaScript's first update.
+   JavaScript overrides the time-dependent subset; the rest are CSS defaults. */
+:root {
+  /* Sky */
+  --sky-top: #56b8ed;
+  --sky-middle: #9edcf5;
+  --sky-bottom: #f8d8a4;
+
+  /* Atmosphere */
+  --sky-glow-opacity: 0.25;
+  --night-opacity: 0;
+
+  /* Sun */
+  --sun-x: 50%;
+  --sun-y: 25%;
+  --sun-opacity: 1;
+  --sun-scale: 1;
+  --sun-glow: 0.7;
+
+  /* Moon */
+  --moon-x: 75%;
+  --moon-y: 22%;
+  --moon-opacity: 0;
+  --moon-scale: 0.9;
+
+  /* Stars */
+  --stars-opacity: 0;
+
+  /* Clouds */
+  --cloud-opacity: 0.8;
+  --cloud-brightness: 1;
+
+  /* Landscape */
+  --mountain-back: #6799b5;
+  --mountain-front: #426b82;
+
+  /* Ground */
+  --ground-top: #365f48;
+  --ground-bottom: #1e3c2c;
+
+  /* Water */
+  --water-top: #3f9bc1;
+  --water-bottom: #1c5875;
+  --reflection-opacity: 0.35;
+
+  /* Cabin */
+  --cabin-light: 0;
+
+  /* Golden hour */
+  --golden-opacity: 0;
+
+  /* Text */
+  --text-color: rgba(255, 255, 255, 0.96);
+
+  /* General */
+  --scene-transition: 1.5s ease;
+}
+
+/* GLOBAL BOX MODEL AND DOCUMENT SIZING
+   Including padding and borders inside declared dimensions makes sizing easier to predict. */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  background: #101d2b;
+
+  overflow: hidden;
+
+  color: var(--text-color);
+}
+
+/* SCENE CANVAS
+   Relative positioning anchors the absolutely positioned visual layers.
+   isolation creates a local stacking context; overflow hides shapes outside the scene. */
+
+.scene {
+  position: relative;
+
+  width: 100%;
+  height: 100svh;
+  min-height: 560px;
+
+  overflow: hidden;
+
+  isolation: isolate;
+
+  background: #101d2b;
+}
+
+/* SKY BACKGROUND
+   The three independently controlled color stops form the daytime gradient. */
+
+.sky {
+  position: absolute;
+
+  inset: 0;
+
+  z-index: 1;
+
+  overflow: hidden;
+
+  background: linear-gradient(
+    to bottom,
+    var(--sky-top) 0%,
+    var(--sky-middle) 52%,
+    var(--sky-bottom) 100%
+  );
+
+  transition: background var(--scene-transition);
+}
+
+/* NIGHT FILTER
+   This pseudo-element overlays the sky; JavaScript controls its opacity from 0 to 1. */
+
+.sky::after {
+  content: "";
+
+  position: absolute;
+
+  inset: 0;
+
+  background: linear-gradient(
+    to bottom,
+    rgba(7, 18, 53, 0.96),
+    rgba(15, 31, 70, 0.88) 55%,
+    rgba(21, 45, 70, 0.7)
+  );
+
+  opacity: var(--night-opacity);
+
+  pointer-events: none;
+
+  transition: opacity var(--scene-transition);
+}
+
+/* ATMOSPHERIC GLOW
+   Positioned with the sun variables so the warm halo follows the sun through the sky. */
+
+.sky-glow {
+  position: absolute;
+
+  width: 70vw;
+  height: 70vw;
+
+  max-width: 900px;
+  max-height: 900px;
+
+  left: var(--sun-x);
+  top: var(--sun-y);
+
+  transform: translate(-50%, -50%);
+
+  border-radius: 50%;
+
+  background: radial-gradient(
+    circle,
+    rgba(255, 221, 147, 0.55) 0%,
+    rgba(255, 177, 110, 0.2) 30%,
+    transparent 70%
+  );
+
+  opacity: var(--sky-glow-opacity);
+
+  pointer-events: none;
+
+  transition:
+    left 1.5s ease,
+    top 1.5s ease,
+    opacity var(--scene-transition);
+}
+
+/* SUN DISC
+   Its center is placed at the JavaScript-calculated x/y position. translate(-50%, -50%)
+   makes those coordinates refer to the center rather than the element's top-left corner. */
+
+.sun {
+  position: absolute;
+
+  z-index: 5;
+
+  left: var(--sun-x);
+  top: var(--sun-y);
+
+  width: clamp(52px, 7vw, 105px);
+  aspect-ratio: 1;
+
+  transform: translate(-50%, -50%) scale(var(--sun-scale));
+
+  border-radius: 50%;
+
+  background: radial-gradient(
+    circle at 35% 30%,
+    #fff8cf 0%,
+    #ffe48b 35%,
+    #ffc65e 72%,
+    #ffab42 100%
+  );
+
+  opacity: var(--sun-opacity);
+
+  box-shadow:
+    0 0 30px rgba(255, 211, 103, 0.7),
+    0 0 80px rgba(255, 182, 77, 0.45),
+    0 0 150px rgba(255, 159, 63, 0.22);
+
+  transition:
+    left 1.5s cubic-bezier(0.45, 0, 0.55, 1),
+    top 1.5s cubic-bezier(0.45, 0, 0.55, 1),
+    opacity var(--scene-transition),
+    transform var(--scene-transition),
+    box-shadow var(--scene-transition);
+}
+
+/* Extra sun glow */
+
+.sun-glow {
+  position: absolute;
+
+  inset: -50%;
+
+  border-radius: 50%;
+
+  background: radial-gradient(
+    circle,
+    rgba(255, 220, 126, 0.32),
+    transparent 68%
+  );
+
+  animation: sunPulse 5s ease-in-out infinite;
+}
+
+@keyframes sunPulse {
+  0%,
+  100% {
+    transform: scale(0.96);
+    opacity: 0.7;
+  }
+
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
+/* MOON DISC
+   Uses separate CSS variables for position and visibility during the night interval. */
+
+.moon {
+  position: absolute;
+
+  z-index: 5;
+
+  left: var(--moon-x);
+  top: var(--moon-y);
+
+  width: clamp(45px, 5vw, 78px);
+  aspect-ratio: 1;
+
+  transform: translate(-50%, -50%) scale(var(--moon-scale));
+
+  border-radius: 50%;
+
+  background: radial-gradient(
+    circle at 35% 30%,
+    #fffef0 0%,
+    #f4efc7 55%,
+    #d7d6bb 100%
+  );
+
+  opacity: var(--moon-opacity);
+
+  box-shadow:
+    0 0 25px rgba(238, 238, 205, 0.35),
+    0 0 70px rgba(210, 220, 255, 0.15);
+
+  overflow: hidden;
+
+  transition:
+    left 1.5s ease,
+    top 1.5s ease,
+    opacity var(--scene-transition),
+    transform var(--scene-transition);
+}
+
+/* Moon shadow / crater effect */
+
+.moon-shadow {
+  position: absolute;
+
+  width: 20%;
+  height: 20%;
+
+  left: 20%;
+  top: 28%;
+
+  border-radius: 50%;
+
+  background: rgba(160, 158, 137, 0.2);
+
+  box-shadow:
+    20px 15px 0 4px rgba(160, 158, 137, 0.12),
+    8px 28px 0 2px rgba(160, 158, 137, 0.14),
+    28px -8px 0 2px rgba(160, 158, 137, 0.1);
+}
+
+/* STAR FIELD
+   Individual spans are positioned below; the parent opacity fades the entire field. */
+
+.stars {
+  position: absolute;
+
+  inset: 0;
+
+  z-index: 4;
+
+  opacity: var(--stars-opacity);
+
+  transition: opacity 2s ease;
+}
+
+.stars span {
+  position: absolute;
+
+  width: 3px;
+  height: 3px;
+
+  border-radius: 50%;
+
+  background: white;
+
+  box-shadow: 0 0 5px rgba(255, 255, 255, 0.9);
+
+  animation: twinkle 3s ease-in-out infinite;
+}
+
+.star-1 {
+  top: 9%;
+  left: 12%;
+}
+
+.star-2 {
+  top: 16%;
+  left: 26%;
+
+  animation-delay: 0.7s;
+}
+
+.star-3 {
+  top: 11%;
+  left: 42%;
+
+  animation-delay: 1.2s;
+}
+
+.star-4 {
+  top: 24%;
+  left: 57%;
+
+  animation-delay: 0.3s;
+}
+
+.star-5 {
+  top: 13%;
+  left: 72%;
+
+  animation-delay: 1.8s;
+}
+
+.star-6 {
+  top: 30%;
+  left: 84%;
+
+  animation-delay: 0.9s;
+}
+
+.star-7 {
+  top: 20%;
+  left: 91%;
+
+  animation-delay: 2s;
+}
+
+.star-8 {
+  top: 34%;
+  left: 18%;
+
+  animation-delay: 1.5s;
+}
+
+.star-9 {
+  top: 28%;
+  left: 34%;
+
+  animation-delay: 0.4s;
+}
+
+.star-10 {
+  top: 38%;
+  left: 48%;
+
+  animation-delay: 2.3s;
+}
+
+.star-11 {
+  top: 19%;
+  left: 63%;
+
+  animation-delay: 1.1s;
+}
+
+.star-12 {
+  top: 31%;
+  left: 76%;
+
+  animation-delay: 0.8s;
+}
+
+.star-13 {
+  top: 8%;
+  left: 87%;
+
+  animation-delay: 1.7s;
+}
+
+.star-14 {
+  top: 42%;
+  left: 7%;
+
+  animation-delay: 2.1s;
+}
+
+.star-15 {
+  top: 26%;
+  left: 49%;
+
+  animation-delay: 0.6s;
+}
+
+.star-16 {
+  top: 15%;
+  left: 54%;
+
+  animation-delay: 1.4s;
+}
+
+.star-17 {
+  top: 36%;
+  left: 66%;
+
+  animation-delay: 2.5s;
+}
+
+.star-18 {
+  top: 12%;
+  left: 33%;
+
+  animation-delay: 0.2s;
+}
+
+.star-19 {
+  top: 40%;
+  left: 89%;
+
+  animation-delay: 1.9s;
+}
+
+.star-20 {
+  top: 23%;
+  left: 4%;
+
+  animation-delay: 2.7s;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    transform: scale(0.7);
+    opacity: 0.45;
+  }
+
+  50% {
+    transform: scale(1.5);
+    opacity: 1;
+  }
+}
+
+/* CLOUDS
+   Each cloud is a rounded base plus circular child spans; brightness/opacity come from JS. */
+
+.cloud {
+  position: absolute;
+
+  z-index: 6;
+
+  width: 180px;
+  height: 42px;
+
+  border-radius: 50px;
+
+  background: rgba(255, 255, 255, var(--cloud-opacity));
+
+  filter: brightness(var(--cloud-brightness));
+
+  opacity: var(--cloud-opacity);
+
+  animation: cloudFloat 45s linear infinite;
+
+  transition:
+    opacity 2s ease,
+    filter 2s ease;
+}
+
+/* Cloud bubbles */
+
+.cloud span {
+  position: absolute;
+
+  display: block;
+
+  bottom: 0;
+
+  border-radius: 50%;
+
+  background: inherit;
+}
+
+.cloud span:nth-child(1) {
+  width: 65px;
+  height: 65px;
+
+  left: 20px;
+  bottom: 8px;
+}
+
+.cloud span:nth-child(2) {
+  width: 85px;
+  height: 85px;
+
+  left: 65px;
+  bottom: 3px;
+}
+
+.cloud span:nth-child(3) {
+  width: 55px;
+  height: 55px;
+
+  right: 15px;
+  bottom: 5px;
+}
+
+.cloud-1 {
+  top: 23%;
+  left: 5%;
+
+  transform: scale(0.9);
+}
+
+.cloud-2 {
+  top: 34%;
+  left: 48%;
+
+  transform: scale(0.65);
+
+  animation-duration: 55s;
+  animation-delay: -18s;
+}
+
+.cloud-3 {
+  top: 17%;
+  left: 73%;
+
+  transform: scale(0.5);
+
+  animation-duration: 65s;
+  animation-delay: -30s;
+}
+
+@keyframes cloudFloat {
+  from {
+    margin-left: -10vw;
+  }
+
+  to {
+    margin-left: 120vw;
+  }
+}
+
+/* MOUNTAIN LAYERS
+   Zero-sized elements with transparent side borders and a colored bottom border make triangles. */
+
+.mountain-layer {
+  position: absolute;
+
+  left: 0;
+  right: 0;
+
+  bottom: 30%;
+
+  height: 38%;
+
+  z-index: 7;
+
+  pointer-events: none;
+}
+
+/* Individual mountains */
+
+.mountain {
+  position: absolute;
+
+  bottom: 0;
+
+  width: 0;
+  height: 0;
+
+  border-left: clamp(100px, 14vw, 240px) solid transparent;
+
+  border-right: clamp(100px, 14vw, 240px) solid transparent;
+
+  border-bottom: clamp(160px, 24vw, 370px) solid var(--mountain-back);
+
+  transition: border-bottom-color 2s ease;
+}
+
+/* Back layer */
+
+.mountain-layer-back {
+  opacity: 0.9;
+}
+
+.mountain-back-1 {
+  left: 2%;
+  transform: scale(0.8);
+}
+
+.mountain-back-2 {
+  left: 28%;
+  transform: scale(0.95);
+}
+
+.mountain-back-3 {
+  right: 2%;
+  transform: scale(0.75);
+}
+
+/* Front layer */
+
+.mountain-layer-front {
+  bottom: 27%;
+
+  height: 35%;
+
+  z-index: 8;
+}
+
+.mountain-layer-front .mountain {
+  border-bottom-color: var(--mountain-front);
+}
+
+.mountain-front-1 {
+  left: 13%;
+  transform: scale(1.05);
+}
+
+.mountain-front-2 {
+  right: 18%;
+  transform: scale(0.9);
+}
+
+/* LAKE AND WATER EFFECTS
+   Gradients define depth; pseudo-elements, narrow spans, and keyframes create texture/reflections. */
+
+.lake {
+  position: absolute;
+
+  left: 0;
+  right: 0;
+
+  bottom: 0;
+
+  height: 42%;
+
+  z-index: 9;
+
+  background: linear-gradient(to bottom, var(--water-top), var(--water-bottom));
+
+  transition: background 2s ease;
+
+  overflow: hidden;
+}
+
+/* Slight water texture */
+
+.lake::before {
+  content: "";
+
+  position: absolute;
+
+  inset: 0;
+
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 19px,
+    rgba(255, 255, 255, 0.08) 20px,
+    transparent 21px
+  );
+
+  opacity: 0.45;
+
+  animation: waterShift 8s ease-in-out infinite;
+}
+
+@keyframes waterShift {
+  0%,
+  100% {
+    transform: translateX(-10px);
+  }
+
+  50% {
+    transform: translateX(10px);
+  }
+}
+
+/* light reflection */
+
+.light-reflection {
+  position: absolute;
+
+  left: var(--sun-x);
+
+  top: 2%;
+
+  width: clamp(70px, 10vw, 150px);
+  height: 85%;
+
+  transform: translateX(-50%);
+
+  opacity: var(--reflection-opacity);
+
+  filter: blur(2px);
+
+  transition:
+    left 1.5s ease,
+    opacity 2s ease;
+}
+
+.light-reflection span {
+  display: block;
+
+  height: 8px;
+
+  margin: 10px auto;
+
+  border-radius: 50%;
+
+  background: rgba(255, 214, 107, 0.75);
+
+  animation: reflectionMove 4s ease-in-out infinite;
+}
+
+.light-reflection span:nth-child(1) {
+  width: 45%;
+}
+
+.light-reflection span:nth-child(2) {
+  width: 70%;
+
+  animation-delay: 0.4s;
+}
+
+.light-reflection span:nth-child(3) {
+  width: 35%;
+
+  animation-delay: 0.9s;
+}
+
+.light-reflection span:nth-child(4) {
+  width: 85%;
+
+  animation-delay: 1.2s;
+}
+
+.light-reflection span:nth-child(5) {
+  width: 55%;
+
+  animation-delay: 0.7s;
+}
+
+.light-reflection span:nth-child(6) {
+  width: 90%;
+
+  animation-delay: 1.5s;
+}
+
+.light-reflection span:nth-child(7) {
+  width: 65%;
+
+  animation-delay: 1.8s;
+}
+
+@keyframes reflectionMove {
+  0%,
+  100% {
+    transform: translateX(-8px);
+  }
+
+  50% {
+    transform: translateX(8px);
+  }
+}
+
+/* water lines */
+
+.water-lines {
+  position: absolute;
+
+  inset: 0;
+
+  opacity: 0.35;
+}
+
+.water-lines span {
+  position: absolute;
+
+  display: block;
+
+  height: 2px;
+
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, 0.35);
+
+  animation: waterWave 6s ease-in-out infinite;
+}
+
+.water-lines span:nth-child(1) {
+  width: 18%;
+  top: 25%;
+  left: 10%;
+}
+
+.water-lines span:nth-child(2) {
+  width: 12%;
+  top: 38%;
+  left: 42%;
+
+  animation-delay: 1s;
+}
+
+.water-lines span:nth-child(3) {
+  width: 25%;
+  top: 50%;
+  right: 8%;
+
+  animation-delay: 2s;
+}
+
+.water-lines span:nth-child(4) {
+  width: 15%;
+  top: 63%;
+  left: 25%;
+
+  animation-delay: 1.5s;
+}
+
+.water-lines span:nth-child(5) {
+  width: 20%;
+  top: 72%;
+  right: 30%;
+
+  animation-delay: 2.5s;
+}
+
+.water-lines span:nth-child(6) {
+  width: 10%;
+  top: 82%;
+  left: 12%;
+
+  animation-delay: 0.5s;
+}
+
+.water-lines span:nth-child(7) {
+  width: 16%;
+  top: 91%;
+  right: 10%;
+
+  animation-delay: 3s;
+}
+
+@keyframes waterWave {
+  0%,
+  100% {
+    transform: scaleX(0.8);
+    opacity: 0.4;
+  }
+
+  50% {
+    transform: scaleX(1.1);
+    opacity: 0.8;
+  }
+}
+
+/* FOREGROUND GROUP
+   This full-scene layer contains trees, cabins, and plants and sits in front of the lake. */
+
+.foreground {
+  position: absolute;
+
+  inset: 0;
+
+  z-index: 12;
+
+  pointer-events: none;
+}
+
+/* FOREST GROUPS
+   Flex layout aligns the tree triangles along the ground; left/right classes anchor each group. */
+
+.forest {
+  position: absolute;
+
+  bottom: 22%;
+
+  display: flex;
+
+  align-items: flex-end;
+
+  gap: clamp(8px, 1.5vw, 25px);
+}
+
+.forest-left {
+  left: -2%;
+}
+
+.forest-right {
+  right: -2%;
+}
+
+/* TREE SHAPES
+   Like the mountains, each tree is a CSS triangle; ::after draws its trunk. */
+
+.tree {
+  position: relative;
+
+  width: 0;
+  height: 0;
+
+  border-left: clamp(18px, 2vw, 35px) solid transparent;
+
+  border-right: clamp(18px, 2vw, 35px) solid transparent;
+
+  border-bottom: clamp(90px, 14vw, 190px) solid #183b2a;
+
+  filter: drop-shadow(5px 8px 5px rgba(0, 0, 0, 0.15));
+}
+
+/* Tree trunks */
+
+.tree::after {
+  content: "";
+
+  position: absolute;
+
+  left: 50%;
+
+  transform: translateX(-50%);
+
+  top: 70%;
+
+  width: clamp(5px, 0.5vw, 9px);
+
+  height: 35px;
+
+  background: #4a3427;
+}
+
+/* Different sizes */
+
+.tree-1 {
+  transform: scale(0.85);
+}
+
+.tree-2 {
+  transform: scale(1.15);
+}
+
+.tree-3 {
+  transform: scale(0.7);
+}
+
+.tree-4 {
+  transform: scale(1);
+}
+
+.tree-5 {
+  transform: scale(0.8);
+}
+
+.tree-6 {
+  transform: scale(1.2);
+}
+
+.tree-7 {
+  transform: scale(1.1);
+}
+
+.tree-8 {
+  transform: scale(0.75);
+}
+
+.tree-9 {
+  transform: scale(1.25);
+}
+
+.tree-10 {
+  transform: scale(0.9);
+}
+
+/* CABINS
+   Roofs, bodies, windows, doors, and porches are separate CSS-drawn pieces. */
+
+.cabin {
+  position: absolute;
+
+  left: 70%;
+
+  bottom: 17%;
+
+  width: clamp(160px, 20vw, 310px);
+
+  filter: drop-shadow(0 18px 20px rgba(0, 0, 0, 0.2));
+
+  pointer-events: none;
+}
+
+.cabin-right {
+  position: absolute;
+
+  left: 11%;
+
+  bottom: 17%;
+
+  width: clamp(160px, 20vw, 310px);
+
+  filter: drop-shadow(0 18px 20px rgba(0, 0, 0, 0.2));
+
+  pointer-events: none;
+}
+
+/* Roof: transparent side borders and a colored bottom border form a triangle. */
+
+.cabin-roof {
+  position: relative;
+
+  width: 0;
+  height: 0;
+
+  margin-left: -8%;
+
+  border-left: calc(clamp(160px, 20vw, 310px) * 0.58) solid transparent;
+
+  border-right: calc(clamp(160px, 20vw, 310px) * 0.58) solid transparent;
+
+  border-bottom: calc(clamp(160px, 20vw, 310px) * 0.42) solid #49352f;
+
+  z-index: 3;
+}
+
+/* Roof highlight */
+
+.cabin-roof::after {
+  content: "";
+
+  position: absolute;
+
+  left: -45%;
+
+  top: 15%;
+
+  width: 90%;
+
+  height: 3px;
+
+  transform: rotate(-24deg);
+
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* Chimney */
+
+.chimney {
+  position: absolute;
+
+  z-index: 4;
+
+  right: 18%;
+
+  top: -8%;
+
+  width: 12%;
+  height: 28%;
+
+  background: #5b4b47;
+}
+
+/* Cabin body */
+
+.cabin-body {
+  position: relative;
+
+  width: 100%;
+  height: clamp(100px, 13vw, 190px);
+
+  background: linear-gradient(90deg, #9a6345, #bb7a51 50%, #89553d);
+
+  border-radius: 2px 2px 8px 8px;
+
+  overflow: hidden;
+}
+
+/* Wooden lines */
+
+.cabin-body::after {
+  content: "";
+
+  position: absolute;
+
+  inset: 0;
+
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 17px,
+    rgba(70, 40, 27, 0.13) 18px,
+    transparent 19px
+  );
+}
+
+/* WINDOWS
+   The base gradient simulates glass; child spans create the vertical/horizontal window frame. */
+
+.cabin-window {
+  position: absolute;
+
+  z-index: 5;
+
+  top: 24%;
+
+  width: 22%;
+  height: 35%;
+
+  border: 5px solid #4c352b;
+
+  background: linear-gradient(
+    135deg,
+    rgba(183, 227, 239, 0.9),
+    rgba(84, 158, 183, 0.8)
+  );
+
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.12),
+    0 0 0 1px rgba(0, 0, 0, 0.1);
+
+  transition:
+    background 2s ease,
+    box-shadow 2s ease;
+}
+
+.cabin-window-left {
+  left: 12%;
+}
+
+.cabin-window-right {
+  right: 12%;
+}
+
+/* Window frame */
+
+.cabin-window span {
+  position: absolute;
+
+  background: #4c352b;
+}
+
+.cabin-window span:first-child {
+  top: 0;
+  bottom: 0;
+
+  left: 50%;
+
+  width: 4px;
+
+  transform: translateX(-50%);
+}
+
+.cabin-window span:last-child {
+  left: 0;
+  right: 0;
+
+  top: 50%;
+
+  height: 4px;
+
+  transform: translateY(-50%);
+}
+
+/* cabin door */
+
+.cabin-door {
+  position: absolute;
+
+  z-index: 5;
+
+  bottom: 0;
+  left: 40%;
+
+  width: 20%;
+  height: 54%;
+
+  background: linear-gradient(90deg, #513a30, #684638);
+
+  border: 3px solid #432f27;
+}
+
+.door-handle {
+  position: absolute;
+
+  right: 13%;
+  top: 52%;
+
+  width: 5px;
+  height: 5px;
+
+  border-radius: 50%;
+
+  background: #d5ae60;
+}
+
+/* cabin porch */
+
+.cabin-porch {
+  position: absolute;
+
+  left: -5%;
+
+  bottom: -7%;
+
+  width: 110%;
+  height: 9%;
+
+  background: #694735;
+
+  border-radius: 2px;
+}
+
+/* CABIN LIGHTS
+   A radial pseudo-element and box shadow use --cabin-light for their night-time glow. */
+
+.cabin-window::before {
+  content: "";
+
+  position: absolute;
+
+  inset: -15px;
+
+  z-index: -1;
+
+  background: radial-gradient(circle, rgba(255, 194, 91, 0.8), transparent 70%);
+
+  opacity: var(--cabin-light);
+
+  transition: opacity 2s ease;
+}
+
+.cabin-window {
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.05),
+    0 0 25px rgba(255, 194, 91, var(--cabin-light));
+}
+
+/* FOREGROUND PLANTS
+   Rotated narrow spans provide simple grass/plant silhouettes. */
+
+.plants {
+  position: absolute;
+
+  left: 0;
+  bottom: 12%;
+
+  width: 40%;
+  height: 12%;
+}
+
+.plants span {
+  position: absolute;
+
+  bottom: 0;
+
+  width: 4px;
+  height: 35px;
+
+  border-radius: 100%;
+
+  background: #234c31;
+
+  transform-origin: bottom;
+}
+
+.plants span:nth-child(1) {
+  left: 8%;
+  transform: rotate(-20deg);
+}
+
+.plants span:nth-child(2) {
+  left: 15%;
+  height: 45px;
+  transform: rotate(18deg);
+}
+
+.plants span:nth-child(3) {
+  left: 23%;
+  height: 30px;
+  transform: rotate(-12deg);
+}
+
+.plants span:nth-child(4) {
+  left: 30%;
+  height: 50px;
+  transform: rotate(22deg);
+}
+
+.plants span:nth-child(5) {
+  left: 40%;
+  height: 38px;
+  transform: rotate(-25deg);
+}
+
+.plants span:nth-child(6) {
+  left: 48%;
+  height: 45px;
+  transform: rotate(14deg);
+}
+
+.plants span:nth-child(7) {
+  left: 58%;
+  height: 30px;
+  transform: rotate(-15deg);
+}
+
+.plants span:nth-child(8) {
+  left: 66%;
+  height: 42px;
+  transform: rotate(20deg);
+}
+
+/* golden hour */
+
+.golden-hour-overlay {
+  /* The screen blend mode adds a warm tint without hiding the scenery underneath. */
+  position: absolute;
+
+  inset: 0;
+
+  z-index: 10;
+
+  pointer-events: none;
+
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 167, 82, 0.08),
+    rgba(255, 117, 72, 0.16) 55%,
+    rgba(255, 94, 55, 0.1)
+  );
+
+  mix-blend-mode: screen;
+
+  opacity: var(--golden-opacity);
+
+  transition: opacity 2s ease;
+}
+
+/* TIME INFORMATION
+   Positioned above the artwork; clamp() scales spacing and typography between viewport sizes. */
+
+.time-info {
+  position: absolute;
+
+  z-index: 30;
+
+  top: clamp(30px, 7vh, 80px);
+  left: clamp(24px, 6vw, 90px);
+
+  max-width: 650px;
+
+  color: var(--text-color);
+
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.22);
+}
+
+/* Small label */
+
+.eyebrow {
+  display: inline-block;
+
+  margin: 0 0 14px;
+
+  font-size: 11px;
+
+  font-weight: 700;
+
+  letter-spacing: 3px;
+
+  opacity: 0.78;
+}
+
+/* Live indicator */
+
+.live-indicator {
+  display: inline-flex;
+
+  align-items: center;
+
+  gap: 6px;
+
+  margin-left: 12px;
+
+  padding: 5px 9px;
+
+  border: 1px solid rgba(255, 255, 255, 0.18);
+
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, 0.08);
+
+  backdrop-filter: blur(8px);
+
+  font-size: 9px;
+
+  font-weight: 700;
+
+  letter-spacing: 1.5px;
+
+  vertical-align: middle;
+}
+
+.live-dot {
+  width: 5px;
+  height: 5px;
+
+  border-radius: 50%;
+
+  background: #9dffb1;
+
+  box-shadow: 0 0 8px rgba(157, 255, 177, 0.9);
+
+  animation: livePulse 2s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Clock */
+
+.current-time {
+  display: block;
+
+  margin: 0;
+
+  font-size: clamp(48px, 7vw, 96px);
+
+  line-height: 0.95;
+
+  font-weight: 600;
+
+  letter-spacing: -4px;
+}
+
+/* Greeting */
+
+.time-info h1 {
+  margin: 18px 0 0;
+
+  font-size: clamp(26px, 3.5vw, 48px);
+
+  line-height: 1.1;
+
+  font-weight: 500;
+
+  letter-spacing: -1.5px;
+}
+
+/* Description */
+
+.scene-description {
+  margin: 12px 0 0;
+
+  max-width: 430px;
+
+  font-size: clamp(13px, 1.3vw, 17px);
+
+  line-height: 1.6;
+
+  opacity: 0.78;
+}
+
+/* DAY TIMELINE
+   A translucent, blurred panel groups the phases; JavaScript applies .active to one phase. */
+
+.day-timeline {
+  position: absolute;
+
+  z-index: 30;
+
+  left: 50%;
+  bottom: clamp(24px, 5vh, 55px);
+
+  transform: translateX(-50%);
+
+  display: flex;
+
+  align-items: stretch;
+
+  gap: 0;
+
+  min-width: min(620px, 90vw);
+
+  padding: 12px;
+
+  border: 1px solid rgba(255, 255, 255, 0.16);
+
+  border-radius: 24px;
+
+  background: rgba(20, 42, 62, 0.34);
+
+  backdrop-filter: blur(18px) saturate(120%);
+
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+}
+
+/* 24-HOUR PROGRESS BAR
+   JavaScript scales this bar from its left edge to the current point in the day. */
+
+.timeline-progress {
+  position: absolute;
+
+  left: 12px;
+  right: 12px;
+
+  bottom: 0;
+
+  height: 2px;
+
+  transform-origin: left;
+
+  background: rgba(255, 255, 255, 0.65);
+
+  opacity: 0.6;
+
+  pointer-events: none;
+}
+
+/* Individual phase */
+
+.time-phase {
+  position: relative;
+
+  flex: 1;
+
+  min-width: 90px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 3px;
+
+  padding: 8px 8px;
+
+  border-radius: 15px;
+
+  opacity: 0.58;
+
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease,
+    background 0.5s ease;
+}
+
+/* Active phase */
+
+.time-phase.active {
+  opacity: 1;
+
+  background: rgba(255, 255, 255, 0.1);
+
+  transform: translateY(-3px);
+}
+
+/* Phase icon */
+
+.phase-icon {
+  display: block;
+
+  margin-bottom: 2px;
+
+  font-size: 22px;
+
+  line-height: 1;
+
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.15));
+}
+
+/* Phase name */
+
+.phase-name {
+  font-size: 11px;
+
+  font-weight: 600;
+
+  white-space: nowrap;
+}
+
+/* Phase time */
+
+.phase-time {
+  font-size: 9px;
+
+  opacity: 0.62;
+
+  white-space: nowrap;
+}
+
+/* Golden hour special state */
+
+.golden-phase.active {
+  background: rgba(255, 181, 87, 0.18);
+
+  box-shadow: inset 0 0 20px rgba(255, 174, 72, 0.08);
+}
+
+.golden-phase.active .phase-name {
+  color: #ffd486;
+}
+
+/* VISUALLY HIDDEN STATUS
+   Remains available to screen readers while taking almost no visible space. */
+
+.visually-hidden {
+  position: absolute;
+
+  width: 1px;
+  height: 1px;
+
+  padding: 0;
+  margin: -1px;
+
+  overflow: hidden;
+
+  clip: rect(0, 0, 0, 0);
+
+  white-space: nowrap;
+
+  border: 0;
+}
+
+/* TABLET LAYOUT
+   Adjust horizon, lake, cabin, and timeline proportions at medium viewport widths. */
+
+@media (max-width: 900px) {
+  .mountain-layer {
+    bottom: 34%;
+  }
+
+  .mountain-layer-front {
+    bottom: 31%;
+  }
+
+  .lake {
+    height: 39%;
+  }
+
+  .cabin {
+    left: 8%;
+    bottom: 18%;
+  }
+
+  .day-timeline {
+    min-width: 600px;
+  }
+}
+
+/* MOBILE LAYOUT
+   Repositions the header and landscape and lets the phase strip scroll horizontally. */
+
+@media (max-width: 600px) {
+  .scene {
+    min-height: 600px;
+  }
+
+  /* Sky */
+
+  .sky-glow {
+    width: 100vw;
+    height: 100vw;
+  }
+
+  /* Sun */
+
+  .sun {
+    width: 60px;
+  }
+
+  /* Clouds */
+
+  .cloud {
+    transform: scale(0.55);
+  }
+
+  .cloud-2 {
+    transform: scale(0.4);
+  }
+
+  .cloud-3 {
+    transform: scale(0.35);
+  }
+
+  /* Mountains */
+
+  .mountain-layer {
+    bottom: 34%;
+  }
+
+  .mountain-layer-front {
+    bottom: 31%;
+  }
+
+  /* Lake */
+
+  .lake {
+    height: 40%;
+  }
+
+  /* Forest */
+
+  .forest {
+    bottom: 20%;
+  }
+
+  .forest-right {
+    right: -10%;
+  }
+
+  /* Cabin */
+
+  .cabin {
+    left: 6%;
+
+    bottom: 17%;
+
+    width: 190px;
+  }
+
+  /* Time information */
+
+  .time-info {
+    top: 30px;
+    left: 24px;
+    right: 24px;
+  }
+
+  .eyebrow {
+    font-size: 9px;
+    letter-spacing: 2px;
+  }
+
+  .live-indicator {
+    margin-left: 5px;
+
+    padding: 4px 7px;
+  }
+
+  .current-time {
+    margin-top: 8px;
+
+    font-size: clamp(44px, 15vw, 68px);
+
+    letter-spacing: -3px;
+  }
+
+  .time-info h1 {
+    margin-top: 12px;
+
+    font-size: 30px;
+  }
+
+  .scene-description {
+    max-width: 280px;
+
+    font-size: 13px;
+  }
+
+  /* Timeline */
+
+  .day-timeline {
+    left: 16px;
+    right: 16px;
+
+    bottom: 18px;
+
+    transform: none;
+
+    min-width: 0;
+    width: auto;
+
+    padding: 7px;
+
+    border-radius: 19px;
+
+    overflow-x: auto;
+
+    scrollbar-width: none;
+  }
+
+  .day-timeline::-webkit-scrollbar {
+    display: none;
+  }
+
+  .time-phase {
+    min-width: 76px;
+
+    padding: 7px 5px;
+  }
+
+  .phase-icon {
+    font-size: 18px;
+  }
+
+  .phase-name {
+    font-size: 9px;
+  }
+
+  .phase-time {
+    font-size: 8px;
+  }
+
+  /* Water reflection */
+
+  .light-reflection {
+    width: 90px;
+  }
+}
+
+/* VERY SMALL SCREENS
+   Further reduce text and cabin dimensions to avoid crowding. */
+
+@media (max-width: 380px) {
+  .time-info {
+    top: 24px;
+    left: 18px;
+  }
+
+  .current-time {
+    font-size: 42px;
+  }
+
+  .time-info h1 {
+    font-size: 26px;
+  }
+
+  .scene-description {
+    font-size: 12px;
+  }
+
+  .cabin {
+    transform: scale(0.8);
+
+    transform-origin: bottom left;
+  }
+
+  .time-phase {
+    min-width: 70px;
+  }
+}
+
+/* REDUCED MOTION
+   Respect the operating-system/browser preference by effectively disabling motion. */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+
+    scroll-behavior: auto !important;
+
+    transition-duration: 0.01ms !important;
+  }
+}

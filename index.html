@@ -1,0 +1,314 @@
+<!--
+  FILE OVERVIEW
+  This is the page's structural layer: it defines the semantic document,
+  the decorative landscape elements, the live time information, and the
+  timeline that JavaScript updates. The scene artwork is built from HTML
+  elements styled in style.css; it does not use image assets or a framework.
+
+  RENDERING FLOW
+  1. The browser parses this document and loads style.css from the <head>.
+  2. The body contains one full-screen scene, ordered from sky to foreground.
+  3. script.js is loaded at the end of the body, after the elements it queries.
+  4. JavaScript updates elements by ID and styles them through CSS variables.
+
+  ACCESSIBILITY
+  The landscape is decorative and hidden from assistive technology. The
+  clock, headings, timeline label, <time> element, and live status provide
+  the meaningful textual information about the current scene.
+-->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A time-aware animated landscape that changes with your local time.">
+    <title>Daylight — A Living Landscape</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <main class="scene" id="scene">
+        <!-- The scene is layered in DOM order; CSS z-index controls the final stacking. -->
+        <!-- Sky: CSS draws the background atmosphere, sun, moon, stars, and clouds. -->
+        <section class="sky" aria-hidden="true">
+            <!-- Atmospheric glow -->
+            <div class="sky-glow"></div>
+            <!-- Sun -->
+            <div class="sun">
+                <div class="sun-glow"></div>
+            </div>
+            <!-- Moon -->
+            <div class="moon">
+                <div class="moon-shadow"></div>
+            </div>
+            <!-- Stars -->
+            <div class="stars">
+                <span class="star star-1"></span>
+                <span class="star star-2"></span>
+                <span class="star star-3"></span>
+                <span class="star star-4"></span>
+                <span class="star star-5"></span>
+                <span class="star star-6"></span>
+                <span class="star star-7"></span>
+                <span class="star star-8"></span>
+                <span class="star star-9"></span>
+                <span class="star star-10"></span>
+                <span class="star star-11"></span>
+                <span class="star star-12"></span>
+                <span class="star star-13"></span>
+                <span class="star star-14"></span>
+                <span class="star star-15"></span>
+                <span class="star star-16"></span>
+                <span class="star star-17"></span>
+                <span class="star star-18"></span>
+                <span class="star star-19"></span>
+                <span class="star star-20"></span>
+            </div>
+            <!-- Clouds -->
+            <div class="cloud cloud-1">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <div class="cloud cloud-2">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <div class="cloud cloud-3">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </section>
+
+
+        <!-- Distant mountains sit behind the darker foreground mountain layer. -->
+        <section class="mountain-layer mountain-layer-back" aria-hidden="true">
+            <div class="mountain mountain-back-1"></div>
+            <div class="mountain mountain-back-2"></div>
+            <div class="mountain mountain-back-3"></div>
+        </section>
+
+
+        <!-- Front mountains overlap the distant ones to create depth. -->
+        <section class="mountain-layer mountain-layer-front" aria-hidden="true">
+            <div class="mountain mountain-front-1"></div>
+            <div class="mountain mountain-front-2"></div>
+        </section>
+
+
+        <!-- The lake and its child elements form the water surface and reflections. -->
+        <section class="lake" aria-hidden="true">
+            <!-- Sun / moon reflection -->
+            <div class="light-reflection">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <!-- Small water waves -->
+            <div class="water-lines">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </section>
+
+
+        <!-- Foreground artwork: trees, cabins, and small plants. -->
+        <section class="foreground" aria-hidden="true">
+            <!-- Left-side trees -->
+            <div class="forest forest-left">
+                <div class="tree tree-1"></div>
+                <div class="tree tree-2"></div>
+                <div class="tree tree-3"></div>
+                <div class="tree tree-4"></div>
+                <div class="tree tree-5"></div>
+                <div class="tree tree-6"></div>
+            </div>
+
+
+            <!-- Right-side trees -->
+            <div class="forest forest-right">
+                <div class="tree tree-7"></div>
+                <div class="tree tree-8"></div>
+                <div class="tree tree-9"></div>
+                <div class="tree tree-10"></div>
+            </div>
+
+
+            <!-- Cabin -->
+            <div class="cabin">
+                <!-- Roof -->
+                <div class="cabin-roof"></div>
+                <!-- Chimney -->
+                <div class="chimney"></div>
+                <!-- Cabin body -->
+                <div class="cabin-body">
+                    <!-- Door -->
+                    <div class="cabin-door">
+                        <span class="door-handle"></span>
+                    </div>
+
+                    <!-- Windows -->
+                    <div class="cabin-window cabin-window-left">
+                        <span></span>
+                        <span></span>
+                    </div>
+
+                    <div class="cabin-window cabin-window-right">
+                        <span></span>
+                        <span></span>
+                    </div>
+
+                </div>
+                <!-- Cabin porch -->
+                <div class="cabin-porch"></div>
+            </div>
+
+            <div class="cabin-right">
+                <!-- Roof -->
+                <div class="cabin-roof"></div>
+                <!-- Chimney -->
+                <div class="chimney"></div>
+                <!-- Cabin body -->
+                <div class="cabin-body">
+                    <!-- Door -->
+                    <div class="cabin-door">
+                        <span class="door-handle"></span>
+                    </div>
+
+                    <!-- Windows -->
+                    <div class="cabin-window cabin-window-left">
+                        <span></span>
+                        <span></span>
+                    </div>
+
+                    <div class="cabin-window cabin-window-right">
+                        <span></span>
+                        <span></span>
+                    </div>
+
+                </div>
+                <!-- Cabin porch -->
+                <div class="cabin-porch"></div>
+            </div>
+
+
+            <!-- Small foreground plants -->
+            <div class="plants">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+
+          
+
+        </section>
+
+
+          
+
+
+        <!-- A translucent, time-controlled tint that CSS fades in during golden hour. -->
+        <div class="golden-hour-overlay" aria-hidden="true"></div>
+        <!-- User-facing time and scene text; script.js refreshes these values. -->
+        <header class="time-info">
+
+            <p class="eyebrow">
+                YOUR LOCAL TIME
+            </p>
+
+            <div class="live-indicator">
+                <span class="live-dot"></span>
+                <span>LIVE</span>
+            </div>
+
+            <time id="time" class="current-time" datetime="">
+                12:00 PM
+            </time>
+
+            <h1 id="greeting">
+                Good afternoon
+            </h1>
+
+            <p id="scene-description" class="scene-description">
+                A quiet afternoon by the lake.
+            </p>
+
+        </header>
+
+
+
+        <!-- The active phase and progress bar are synchronized by updateTimeline(). -->
+        <nav class="day-timeline" aria-label="Time of day">
+
+            <div class="timeline-progress" id="timeline-progress"></div>
+
+
+            <div class="time-phase" data-phase="sunrise">
+                <span class="phase-icon">☀</span>
+                <span class="phase-name">Sunrise</span>
+                <span class="phase-time">6:00 AM</span>
+            </div>
+
+
+            <div class="time-phase" data-phase="day">
+                <span class="phase-icon">☀</span>
+                <span class="phase-name">Day</span>
+                <span class="phase-time">12:00 PM</span>
+            </div>
+
+
+            <div class="time-phase golden-phase" data-phase="golden-hour">
+                <span class="phase-icon">◒</span>
+                <span class="phase-name">Golden Hour</span>
+                <span class="phase-time">5:00 PM</span>
+            </div>
+
+
+            <div class="time-phase" data-phase="sunset">
+                <span class="phase-icon">◒</span>
+                <span class="phase-name">Sunset</span>
+                <span class="phase-time">6:00 PM</span>
+            </div>
+
+
+            <div class="time-phase" data-phase="night">
+                <span class="phase-icon">☾</span>
+                <span class="phase-name">Night</span>
+                <span class="phase-time">9:00 PM</span>
+            </div>
+
+        </nav>
+
+
+
+        <!-- Screen-reader announcement; visually hidden but exposed to assistive technology. -->
+        <p id="live-status" class="visually-hidden" aria-live="polite">
+            The scene is synchronized with your local time.
+        </p>
+
+    </main>
+
+
+    <!-- Load behavior after the DOM exists so the script can find its elements. -->
+    <script src="script.js"></script>
+
+</body>
+
+</html>
