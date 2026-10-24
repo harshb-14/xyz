@@ -1,4 +1,4 @@
-# Daylight — A Living Landscape
+# Daylight - A Living Landscape
 
 ## Project overview
 
