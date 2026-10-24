@@ -19,7 +19,7 @@ The design is not a collection of static images. JavaScript calculates time-depe
 5. The scene functions calculate colors, positions, opacity, lighting, text, and the active timeline phase.
 6. JavaScript writes some values into the DOM and others into CSS custom properties on `<html>`.
 7. CSS uses the updated properties to draw the new state and animate the transition.
-8. The update runs immediately, repeats every second, and runs again when a hidden tab becomes visible.
+8. The update runs immediately, repeats at the start of each local minute, and runs again when a hidden tab becomes visible.
 
 ## Project files
 
@@ -100,18 +100,67 @@ For example, 5:00 PM becomes `17 * 60`, or 1,020. Numeric boundaries make it eas
 
 #### Helper math
 
-- `clamp(value, min, max)` bounds a value, commonly to `0..1`, so opacity and progress stay valid.
-- `mapRange(value, inputMin, inputMax, outputMin, outputMax)` converts a value's position in one range to its equivalent position in another.
-- `lerp(start, end, progress)` means linear interpolation. At progress `0` it returns the start; at `1` it returns the end.
-- `smoothStep(value)` eases a normalized progress value so a transition changes more gently near its endpoints.
-- `rgb()` formats numeric color channels as CSS `rgb(...)`.
-- `interpolateColor()` smooths the progress and interpolates the red, green, and blue channels separately.
+These helper functions are small math tools used to calculate scene values. They help JavaScript move from one visual state to another without abruptly jumping.
 
-For example, to transition a value from 20 to 80 at 25% progress:
+##### `mapRange()` — convert a position in one range into another
 
-```text
-20 + (80 - 20) × 0.25 = 35
+```js
+mapRange(value, inputMin, inputMax, outputMin, outputMax)
 ```
+
+Think of `inputMin` and `inputMax` as the start and end of the range you have. `outputMin` and `outputMax` are the start and end of the range you want. `value` is the current point in the input range.
+
+For example, golden hour starts at 5:00 PM (1,020 minutes after midnight) and sunset is at 6:30 PM (1,110 minutes). At 5:45 PM, the current value is 1,065:
+
+```js
+mapRange(1065, 1020, 1110, 0, 1)
+```
+
+This returns `0.5`, meaning the time is halfway between the start and end. Here, `0` represents the beginning of golden hour, and `1` represents its end.
+
+##### `lerp()` — find a value between a start and an end
+
+`lerp` is short for *linear interpolation*:
+
+```js
+lerp(start, end, progress)
+```
+
+`progress` tells how far to move from `start` to `end`: `0` means start, `1` means end, and `0.5` means halfway. For example:
+
+```js
+lerp(20, 80, 0.25) // returns 35
+```
+
+The calculation is `20 + (80 - 20) × 0.25 = 35`. The sun uses this kind of calculation to move horizontally from one percentage of the scene to another.
+
+##### `clamp()` — keep a value inside limits
+
+```js
+clamp(value, min, max)
+```
+
+This keeps a number from going below `min` or above `max`. When the minimum and maximum are `0` and `1`, values smaller than `0` become `0` and values larger than `1` become `1`. This is useful for opacity, where `0` means invisible and `1` means fully visible, and for progress values that should stay within the expected range.
+
+##### `smoothStep()` — make progress ease in and out
+
+A plain progress value moves evenly from `0` to `1`. `smoothStep()` reshapes that value so the change starts gently, moves faster in the middle, and slows near the end. This can make a color change feel less mechanical. It still starts at `0` and ends at `1`.
+
+##### `rgb()` and `interpolateColor()` — blend colors
+
+An RGB color has three numeric channels: red, green, and blue. `rgb()` formats three numbers into a CSS color string, such as `rgb(50, 150, 100)`. `interpolateColor()` calculates the intermediate value for each channel separately.
+
+For example, halfway between `rgb(0, 100, 200)` and `rgb(100, 200, 0)` is approximately `rgb(50, 150, 100)`. The project does this for the top, middle, and bottom colors of the sky.
+
+##### JavaScript interpolation vs. CSS transitions
+
+They work together, but they are different:
+
+1. **JavaScript interpolation** calculates the target value—for example, a new sun position or sky color.
+2. JavaScript writes that value to a CSS custom property.
+3. **A CSS transition** tells the browser to animate from the previous CSS value to the new one over a specified duration.
+
+So the helper functions calculate *what the next value should be*. CSS transitions control *how the browser visually moves to that value*. In this project, JavaScript refreshes at the start of each minute; CSS transitions can smooth the visual change after each refresh.
 
 #### Reading and formatting time
 
@@ -123,7 +172,7 @@ For example, to transition a value from 20 to 80 at 25% progress:
 hours × 60 + minutes + seconds / 60
 ```
 
-The seconds fraction helps values move smoothly between updates. `formatTime()` creates a 12-hour display such as `5:30 PM`. `updateClock()` writes the display into the page and sets the `<time datetime>` attribute in 24-hour format.
+The seconds fraction represents sub-minute time in calculations. The live scheduler currently updates at minute boundaries, so it samples the time at approximately zero seconds each time. `formatTime()` creates a 12-hour display such as `5:30 PM`. `updateClock()` writes the display into the page and sets the `<time datetime>` attribute in 24-hour format.
 
 #### Sky interpolation and midnight
 
@@ -159,7 +208,9 @@ CSS reads the same custom property with `var(--sun-x)`. JavaScript calculates th
 
 #### Scheduling
 
-`updateScene()` runs once immediately, before any timer is created. In live mode, `setInterval(updateScene, 1000)` refreshes the scene once per second. Browsers can throttle timers in background tabs, so the `visibilitychange` listener refreshes the scene when the user returns.
+`updateScene()` runs once immediately, before any timer is created. In live mode, `scheduleNextMinuteUpdate()` uses `setTimeout()` to schedule the next refresh at the start of the next local minute, then schedules the following one after updating. Aligning to the minute boundary avoids a clock that drifts based on when the page was opened. Browsers can throttle timers in background tabs, so the `visibilitychange` listener refreshes the scene when the user returns.
+
+The visible clock only displays hours and minutes, so per-second updates are unnecessary. A once-per-minute refresh reduces repeated JavaScript work and DOM/CSS writes while keeping the displayed precision accurate. The CSS transitions still smooth the visual change after each refresh.
 
 ### 3. `style.css` — drawing, layout, and motion
 
@@ -220,7 +271,7 @@ These are visual rules configured in JavaScript, not astronomical sunrise/sunset
 - The local device time and timezone are reasonably accurate.
 - Sunrise, sunset, and phase times are fixed rather than calculated from a geographic location/date.
 - CSS shapes keep the project self-contained and avoid image downloads, but the illustration is stylized rather than photorealistic.
-- A one-second interval keeps the clock accurate to the displayed second; most scene variables change slowly and CSS transitions smooth the result.
+- A minute-aligned timer keeps the clock accurate to its displayed minute while reducing repeated JavaScript and DOM/CSS updates.
 - The page has no dependency installation or build step, which makes it easy to run but means it has no bundling or automated test setup.
 
 ## Known implementation details
@@ -268,9 +319,9 @@ The JavaScript computes intermediate values with interpolation. CSS transitions 
 
 It does not request or calculate a timezone separately. `new Date()` and its local getters use the browser/device's local date and time settings.
 
-### Why update both every second and on tab visibility?
+### Why update on a minute boundary and on tab visibility?
 
-The one-second timer keeps the clock current while the page is active. Browsers may throttle background timers, so visibility handling recalculates from the actual current time when the visitor returns.
+The clock displays hours and minutes, so updating every minute is sufficient and avoids unnecessary per-second work. The timer is aligned to local minute boundaries so it does not drift based on page-load time. Browsers may throttle background timers, so visibility handling recalculates from the actual current time when the visitor returns.
 
 ### How would you test the night or golden-hour designs?
 
