@@ -330,3 +330,416 @@ Set `TEST_MODE` to `true` and configure `TEST_HOUR` and `TEST_MINUTE` in `script
 ### What would you improve next?
 
 I would add automated browser tests for important boundaries, make the active timeline phases match the exact displayed times, and optionally calculate sunrise/sunset from a chosen location. Those changes would improve verification and make the scene more personalized.
+
+### Interview schedule
+
+| Time | Duration | Topic |
+| --- | ---: | --- |
+| 00:00–00:05 | 5 min | Introductions and project pitch |
+| 00:05–00:15 | 10 min | Assignment goals and requirements |
+| 00:15–00:30 | 15 min | Architecture and file responsibilities |
+| 00:30–00:50 | 20 min | JavaScript time model and helper math |
+| 00:50–01:05 | 15 min | CSS rendering, layers, and transitions |
+| 01:05–01:15 | 10 min | Live demo and testing strategy |
+| 01:15–01:25 | 10 min | Responsive design and accessibility |
+| 01:25–01:35 | 10 min | Trade-offs, limitations, and improvements |
+| 01:35–01:55 | 20 min | Technical deep dive / small design exercise |
+| 01:55–02:00 | 5 min | Candidate questions and closing summary |
+
+### 00:00–00:05 — Introductions and project pitch
+
+**Interviewer: Tell me about the assignment.**
+
+**Example answer:**
+
+> “I built a responsive animated lakeside scene that changes based on the visitor's local device time. I used semantic HTML for the scene structure, vanilla JavaScript to calculate time-dependent values, and CSS to draw the landscape and animate visual changes. It renders immediately, updates at local minute boundaries, refreshes when a hidden tab becomes visible, and includes responsive layouts and reduced-motion support.”
+
+**Interviewer: What was the main challenge?**
+
+**Example answer:**
+
+> “The main challenge was turning a clock time into coordinated visual changes without making the scene switch abruptly. I represented time as minutes after midnight, calculated progress between configured time boundaries, and used that progress for colors, positions, and opacity. CSS custom properties connect those calculations to the presentation.”
+
+**Practice tip:** Keep the opening answer around 30–60 seconds. Start with what the app does, then say how the three technologies work together.
+
+### 00:05–00:15 — Assignment goals and requirements
+
+**Interviewer: What does the page do from a user's point of view?**
+
+**Example answer:**
+
+> “The page shows a stylized landscape and the visitor's local time. As the time changes, the sky palette, sun or moon, stars, clouds, reflections, cabin lighting, greeting, and highlighted timeline phase change. The transitions are intended to feel continuous rather than like switching between separate screens.”
+
+**Interviewer: What are the main time periods?**
+
+**Example answer:**
+
+> “The code defines boundaries such as sunrise at 6 AM, morning at 9 AM, noon at 12 PM, golden hour at 5 PM, sunset at 6:30 PM, dusk at 8 PM, and night at 9 PM. These are fixed design times, not astronomical values calculated for a location.”
+
+**Interviewer: Is the scene a real-time astronomical model?**
+
+**Example answer:**
+
+> “No. It follows the device's local clock, but uses fixed visual boundaries for everyone. A future version could request a location and calculate sunrise and sunset for the date, but that would require a location strategy and careful privacy handling.”
+
+**Interviewer: What is in scope and what is not?**
+
+**Example answer:**
+
+> “It is a static front-end experience. There is no account, backend, API, database, dependency installation, or external image requirement. The artwork is intentionally stylized, and there is no manual time selector in the current interface.”
+
+### 00:15–00:30 — Architecture and file responsibilities
+
+**Interviewer: Walk me through what happens when the page loads.**
+
+**Example answer:**
+
+> “The browser parses `index.html` and loads `style.css`. The HTML elements are declared before `script.js` is loaded at the end of the body, so the script can find them. JavaScript calls `updateScene()` immediately. That reads the current time, calculates the scene state, updates text and CSS custom properties, and the stylesheet renders the result. Live mode then schedules the next minute-boundary update.”
+
+**Interviewer: Why separate HTML, CSS, and JavaScript?**
+
+**Example answer:**
+
+> “Each file has a clear responsibility. HTML defines the elements and meaningful text. JavaScript calculates state and updates the DOM. CSS draws the scene and handles layout and visual transitions. That lets me change the calculation rules without rebuilding the artwork, and restyle the artwork without changing the time model.”
+
+**Interviewer: How does JavaScript communicate with CSS?**
+
+**Example answer:**
+
+> “It updates custom properties on the root `<html>` element with `style.setProperty()`. The stylesheet reads them using `var(--property-name)`. For instance, JavaScript calculates the sun's x-position and writes `--sun-x`; CSS uses that variable for the sun's `left` position and the reflection's location.”
+
+**Interviewer: How are the elements stacked?**
+
+**Example answer:**
+
+> “The scene is a positioned container. The visual layers are absolutely positioned and use `z-index` to establish depth: sky, mountains, lake, foreground, and then the text and timeline. `isolation: isolate` gives the scene its own stacking context, and overflow clipping keeps the artwork inside the viewport.”
+
+**Interviewer: Why load the script at the end of the body?**
+
+**Example answer:**
+
+> “The relevant DOM nodes have already been parsed when the script runs, so calls like `getElementById()` can find them without waiting for a separate DOM-ready event.”
+
+### 00:30–00:50 — JavaScript time model and helper math
+
+**Interviewer: How do you get the visitor's time?**
+
+**Example answer:**
+
+> “`new Date()` reads the browser's current date and time. I use the local getters `getHours()`, `getMinutes()`, and `getSeconds()`, so it follows the device's configured local timezone. The project does not contact a time server.”
+
+**Interviewer: What does minutes since midnight mean?**
+
+**Example answer:**
+
+> “It is a numeric representation of the time: hours times 60, plus minutes, plus the seconds converted to a fraction of a minute. For example, 5:30 PM is 17 hours and 30 minutes, so it is `17 × 60 + 30`, or 1,050 minutes after midnight. A single number makes comparisons and progress calculations easier.”
+
+**Interviewer: Explain `mapRange()` in simple terms.**
+
+**Example answer:**
+
+> “It takes a position in one range and represents the same relative position in another range. The input minimum and maximum are the start and end of the range I have; the output minimum and maximum define the range I want. For golden hour, 1,020 to 1,110 minutes maps to 0 to 1. At 1,065 minutes, the result is 0.5, meaning halfway through.”
+
+**Interviewer: What does `lerp()` do?**
+
+**Example answer:**
+
+> “It finds a value between a start and end using a progress number from 0 to 1. `lerp(20, 80, 0.25)` returns 35, which is one quarter of the way from 20 to 80. The code uses that for positions and visual values.”
+
+**Interviewer: What does `clamp()` protect against?**
+
+**Example answer:**
+
+> “It keeps a number within limits. For example, if opacity must be between 0 and 1, `clamp()` prevents an interpolation calculation from producing an opacity below zero or above one.”
+
+**Interviewer: What is `smoothStep()`?**
+
+**Example answer:**
+
+> “It takes progress from 0 to 1 and reshapes it so a change begins gently, moves faster around the middle, and slows near the end. It is an easing calculation, so the endpoints remain 0 and 1 but the change feels less mechanical.”
+
+**Interviewer: What is a keyframe here?**
+
+**Example answer:**
+
+> “A keyframe is a defined visual state at a particular point. `SKY_STOPS` stores color keyframes: top, middle, and bottom RGB colors at selected times. These are JavaScript data points, not the same thing as CSS `@keyframes`. The code finds the surrounding stops and calculates colors between them.”
+
+**Interviewer: How is a color interpolated?**
+
+**Example answer:**
+
+> “An RGB color is three numeric channels: red, green, and blue. The code calculates a value between the start and end for each channel, then formats those numbers as an `rgb(...)` CSS string. It does this for each sky gradient stop.”
+
+**Interviewer: What is the difference between interpolation and a CSS transition?**
+
+**Example answer:**
+
+> “Interpolation calculates the target value in JavaScript. A CSS transition animates the browser from the old CSS value to that new target. The code computes what the value should be; the transition controls how it looks while changing.”
+
+**Interviewer: Why is midnight a special case?**
+
+**Example answer:**
+
+> “Time wraps from 23:59 to 00:00, but a normal numeric range does not. The sky-stop logic treats midnight as the next day's first color, at minute 1,440, and adjusts elapsed time when it crosses the boundary. That prevents a negative range or an abrupt discontinuity.”
+
+**Interviewer: Why update once per minute instead of every second?**
+
+**Example answer:**
+
+> “The visible clock only shows hours and minutes, so recalculating every second would do unnecessary JavaScript, DOM, and CSS writes. The scheduler aligns the next update to the start of the next minute. The page also renders immediately and refreshes when it becomes visible again, so it can catch up after background timer throttling.”
+
+**Interviewer: Why use a timeout that schedules itself instead of a fixed interval?**
+
+**Example answer:**
+
+> “A one-minute interval would run one minute after the page started, not necessarily at the start of a clock minute. The self-scheduling timeout calculates the milliseconds until the next minute boundary, updates, and schedules again. That keeps the visible minute aligned with the clock.”
+
+**Interviewer: What is the purpose of test mode?**
+
+**Example answer:**
+
+> “It lets me use a fixed hour and minute to inspect a state such as golden hour without changing my computer's clock or waiting for that time. I would turn test mode off before normal use.”
+
+### 00:50–01:05 — CSS rendering, layers, and transitions
+
+**Interviewer: How is the illustration created without images?**
+
+**Example answer:**
+
+> “The scene uses gradients, borders, shadows, pseudo-elements, and positioned HTML elements. For example, transparent left and right borders plus a colored bottom border can make a triangle for a tree or mountain. Rounded elements and gradients create the sun, moon, clouds, and water effects.”
+
+**Interviewer: What is a pseudo-element?**
+
+**Example answer:**
+
+> “`::before` and `::after` let CSS create a decorative generated piece attached to an element without adding another HTML node. They need a `content` declaration. In this project, they add details such as tree trunks, water texture, and window glow.”
+
+**Interviewer: How do the clouds or stars move?**
+
+**Example answer:**
+
+> “CSS `@keyframes` define repeated animation steps, and the `animation` property applies them. Those animations provide ambient motion like twinkling stars and drifting clouds. They are separate from the JavaScript time interpolation: JavaScript controls the scene state, while keyframe animations provide continuous decorative movement.”
+
+**Interviewer: What is the role of `z-index`?**
+
+**Example answer:**
+
+> “It controls the stacking order of positioned layers. The scene uses it to place background elements behind mountains, lake, and foreground, with the interface text and timeline above the illustration.”
+
+**Interviewer: What do `clamp()` and viewport units do in CSS?**
+
+**Example answer:**
+
+> “Viewport units size something relative to the screen. CSS `clamp(min, preferred, max)` lets a size respond to the viewport but stops it becoming too small or too large. That helps typography and artwork scale across devices.”
+
+**Interviewer: How does the golden-hour effect work?**
+
+**Example answer:**
+
+> “The page has a full-scene overlay with a warm gradient. JavaScript changes its opacity during the golden-hour interval. CSS uses a screen blend mode and an opacity transition so the tint is visible without fully covering the landscape.”
+
+**Interviewer: What is the difference between transition and animation?**
+
+**Example answer:**
+
+> “A transition interpolates a property when its value changes, such as a CSS variable changing the sun's position. A keyframe animation can run continuously through declared stages without needing a new JavaScript value each frame.”
+
+### 01:05–01:15 — Live demo and testing strategy
+
+**Interviewer: Demonstrate the project. What will you show?**
+
+**Candidate action plan:**
+
+1. Open `index.html` in a browser.
+2. Point out the local clock, greeting, scene, and timeline.
+3. Explain that the initial render happens immediately.
+4. Temporarily enable test mode and set a time such as 17:30 to show golden hour.
+5. If possible, show a night value and explain the stars, moon, overlay, and cabin lights.
+6. Restore test mode to `false`.
+7. Resize the browser to demonstrate the responsive layout.
+
+**Interviewer: How would you test boundary times?**
+
+**Example answer:**
+
+> “I would test just before, at, and just after each configured boundary—for example, 4:59 PM, 5:00 PM, and 5:01 PM. I would include midnight and sunrise because those cover day-wrap and night-to-morning logic. I would use test mode for these checks.”
+
+**Interviewer: What kinds of tests would you add?**
+
+**Example answer:**
+
+> “I would separate the pure calculations from DOM updates so helper and boundary logic can be unit tested. Then I would add browser tests that set a fixed time and check the clock text, greeting, active timeline phase, and important CSS custom properties. I would also test narrow viewport sizes and the reduced-motion media query.”
+
+**Interviewer: How would you test minute scheduling without waiting a real minute?**
+
+**Example answer:**
+
+> “I would make the scheduling logic testable by injecting or mocking the current date and timers. Then I could check the delay calculation around values such as 12:34:00.000 and 12:34:59.500. In a browser test, fake timers can advance the scheduled callback without waiting in real time.”
+
+**Interviewer: What should the test mode guarantee?**
+
+**Example answer:**
+
+> “It should provide a deterministic time source, disable the live timer, and let the same normal update path render that time. That way the test mode exercises real scene logic rather than a separate mock design.”
+
+### 01:15–01:25 — Responsive design and accessibility
+
+**Interviewer: How does the project adapt to mobile?**
+
+**Example answer:**
+
+> “It uses flexible sizes, viewport units, `clamp()`, and media queries. At smaller breakpoints the scene proportions, typography, cabin, and header adjust. The timeline can scroll horizontally when its phase cards do not fit.”
+
+**Interviewer: Why mark the landscape `aria-hidden`?**
+
+**Example answer:**
+
+> “The trees, clouds, and waves are decorative, not separate information. Hiding those groups avoids a screen reader announcing lots of meaningless shapes. The page still exposes the clock, greeting, description, timeline label, and live status.”
+
+**Interviewer: What does `aria-live="polite"` do?**
+
+**Example answer:**
+
+> “It tells assistive technology that a changed region may be announced when appropriate, without interrupting the user immediately. The hidden status explains the current scene time.”
+
+**Interviewer: Why have a `<time>` element?**
+
+**Example answer:**
+
+> “It semantically identifies the visible content as a time. Its `datetime` attribute can provide a standardized machine-readable representation, while the element's text is the visitor-friendly display.”
+
+**Interviewer: How do you support users who prefer less animation?**
+
+**Example answer:**
+
+> “The stylesheet checks `prefers-reduced-motion: reduce` and makes animation and transition durations nearly instantaneous. That respects a system or browser preference for reduced motion.”
+
+**Interviewer: Is the live announcement every minute always ideal?**
+
+**Example answer:**
+
+> “It avoids announcing every second, but an announcement every minute could still be distracting depending on how the live region is interpreted. I would test with screen readers and consider announcing only meaningful phase changes or making the clock itself the primary accessible time.”
+
+### 01:25–01:35 — Trade-offs, limitations, and improvements
+
+**Interviewer: What trade-offs did you make?**
+
+**Example answer:**
+
+> “Using only CSS shapes keeps the project self-contained and avoids asset loading, but limits detail and realism. Fixed time boundaries keep the logic simple, but they do not reflect actual sunrise and sunset for a person's location. A static project is easy to run, but has no automated test suite or build pipeline.”
+
+**Interviewer: What is a known mismatch in the current project?**
+
+**Example answer:**
+
+> “The sunrise phase is shown in the timeline, but the JavaScript selects the day phase from sunrise until golden hour. Also, the timeline's sunset label says 6:00 PM while the configured sunset boundary is 6:30 PM. I would align the displayed labels and active-state rules.”
+
+**Interviewer: What would you improve first?**
+
+**Example answer:**
+
+> “I would first add boundary-focused automated tests and align the timeline labels with the code's actual time boundaries. Then I would decide whether the product should stay a stylized fixed-time scene or support location-based sunrise and sunset.”
+
+**Interviewer: How would you make it more accurate geographically?**
+
+**Example answer:**
+
+> “I would define a clear location experience: explicit permission or manual location entry, explain why location is needed, and avoid sending it unnecessarily. A tested sunrise/sunset calculation or service would provide daily boundaries. I would also handle permission denial and keep a sensible default.”
+
+**Interviewer: What would you do about performance?**
+
+**Example answer:**
+
+> “The scene is small and CSS handles much of its animation. I reduced JavaScript updates to minute boundaries because the display has minute precision. I would profile on lower-powered devices, avoid animating layout-heavy properties where possible, and prefer transforms and opacity for continuous movement.”
+
+### 01:35–01:55 — Technical deep dive / small design exercise
+
+The interviewer may ask you to reason about a change. Explain your approach before coding: identify the requirement, find the relevant state and rendering path, make the smallest change, then test normal and boundary cases.
+
+#### Exercise A: Add a new color stop at 3:00 PM
+
+**Interviewer: What would you change?**
+
+**Example answer:**
+
+> “I would add a `TIME` constant for 3:00 PM if other behavior needs that boundary, then add an entry to `SKY_STOPS` with top, middle, and bottom RGB arrays. `getSkyStops()` already selects neighboring stops, so I would verify it chooses the new adjacent pairs and test just before, at, and after 3:00 PM.”
+
+#### Exercise B: Fix the sunrise active phase
+
+**Interviewer: The sunrise card should be active from 6:00 to 9:00 AM. How would you implement that?**
+
+**Example answer:**
+
+> “I would update `updateTimeline()` so the sunrise interval selects `sunrise` from `TIME.sunrise` until `TIME.morning`, then select `day` from `TIME.morning` until golden hour. I would test 5:59, 6:00, 8:59, and 9:00 to verify interval boundaries and ensure exactly one phase is active.”
+
+#### Exercise C: Add a manual preview time
+
+**Interviewer: How could a user select a time to preview?**
+
+**Example answer:**
+
+> “I would add a semantic input, such as a time input, and a clear control to return to local time. I would separate the selected preview time from the real-time source, validate the input, and pass a normalized time object into the same `updateScene` pipeline. The manual preview should not silently pretend to be the visitor's actual local time.”
+
+#### Exercise D: Explain the sun arc
+
+**Interviewer: How do you calculate the sun's path?**
+
+**Example answer:**
+
+> “First I normalize the daylight time interval to progress from 0 to 1. I interpolate x-position from the left side to the right side. For y-position, I multiply progress by pi and use sine: sine is near zero at the endpoints and reaches one halfway through, so subtracting a scaled sine from a baseline creates a simple arc. It is an illustration, not a physical astronomical model.”
+
+#### Exercise E: What if the browser timer is delayed?
+
+**Interviewer: Suppose the browser suspends the page for ten minutes. What happens?**
+
+**Example answer:**
+
+> “The timer callback may be delayed. The page does not try to count missed callbacks; when it runs, `updateScene()` reads `new Date()` again, so it calculates from current time. The visibility listener also calls the update when the tab becomes visible.”
+
+#### Exercise F: Find a possible issue in a range calculation
+
+**Interviewer: What could go wrong in `mapRange()`?**
+
+**Example answer:**
+
+> “If `inputMin` and `inputMax` are equal, the calculation divides by zero and can produce `NaN` or infinity. The current calls use ranges with different endpoints, but a reusable helper could guard against equal endpoints or explicitly document that the input range must be nonzero. I would decide the expected behavior before adding a guard.”
+
+#### Exercise G: Improve testability
+
+**Interviewer: How would you make this code easier to test?**
+
+**Example answer:**
+
+> “I would make calculations pure functions that take a time value and return a scene-state object, without directly reading the DOM. A separate renderer would apply that state to CSS variables and text. Then unit tests could verify exact values at boundaries, while a small number of browser tests verify the DOM and visual integration.”
+
+### 01:55–02:00 — Candidate questions and closing
+
+**Interviewer: Do you have questions for me?**
+
+Choose one or two questions relevant to the role:
+
+- “How do you usually test interactive front-end behavior and responsive layouts?”
+- “What accessibility checks are part of the team's definition of done?”
+- “How does the team decide when to use CSS animation versus JavaScript-driven animation?”
+- “What would you expect someone in this role to improve or deliver in their first few months?”
+
+**Closing summary to practise:**
+
+> “The key idea in this assignment is separating time-based state from presentation. I convert local time to a numeric value, calculate scene properties with range mapping and interpolation, and pass those values to CSS custom properties. CSS builds and animates the scene. The main trade-offs are fixed time boundaries and the lack of automated tests; the next steps I would prioritize are boundary tests and making the phase labels and behavior consistent.”
+
+## Quick interview revision sheet
+
+| Term | Plain-language meaning |
+| --- | --- |
+| Minutes after midnight | One number representing the current time; for example, 5:30 PM is 1,050 |
+| Input range | The range containing the value you start with, such as 1,020–1,110 minutes |
+| Output range | The scale you want to map onto, such as progress 0–1 |
+| Progress | How far through an interval a value is, represented from 0 to 1 |
+| Interpolation / `lerp()` | Calculating a value between a start and end |
+| `clamp()` | Keeping a value within allowed limits |
+| `smoothStep()` | Easing progress so a change starts and ends gently |
+| Keyframe | A defined state at a particular point, such as a sky palette at noon |
+| CSS custom property | A reusable CSS variable that JavaScript can update |
+| CSS transition | Browser animation between an old CSS value and a new value |
+| Pseudo-element | A CSS-generated decorative piece, commonly `::before` or `::after` |
+| `datetime` attribute | A standardized machine-readable date/time value on a `<time>` element |
