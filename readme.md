@@ -10,7 +10,7 @@ The scene moves through a day-night cycle:
 
 The design is not a collection of static images. JavaScript calculates time-dependent values and writes them to the page. CSS uses those values to render the scene and transition between visual states.
 
-## Full application flow in short
+## Full application flow
 
 1. The browser opens `index.html` and loads `style.css`.
 2. The HTML creates the scene layers and the text/timeline elements.
@@ -19,7 +19,7 @@ The design is not a collection of static images. JavaScript calculates time-depe
 5. The scene functions calculate colors, positions, opacity, lighting, text, and the active timeline phase.
 6. JavaScript writes some values into the DOM and others into CSS custom properties on `<html>`.
 7. CSS uses the updated properties to draw the new state and animate the transition.
-8. The update runs immediately, repeats at the start of each local minute, and runs again when a hidden tab becomes visible.
+8. The update runs immediately, repeats every second, and runs again when a hidden tab becomes visible.
 
 ## Project files
 
